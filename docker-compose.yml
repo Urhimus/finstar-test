@@ -1,0 +1,74 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    ports:
+      - "${RabbitMQ__Port}:5672"    
+      - "15672:15672"  
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RabbitMQ__User}
+      RABBITMQ_DEFAULT_PASS: ${RabbitMQ__Pass}
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    env_file: ".env"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  taskmanagement.api:
+    build:
+      context: ./TaskManagement.API
+      dockerfile: Dockerfile
+    env_file: ".env"
+    ports:
+      - "62352:8080"
+    container_name: taskmanagement.api
+    depends_on: 
+      rabbitmq: 
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+
+  taskmanagement.consumer:
+    build:
+      context: ./TaskManagement.Consumer
+      dockerfile: Dockerfile
+    env_file: ".env"
+    container_name: taskmanagement.consumer
+    depends_on: 
+      rabbitmq: 
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+
+  taskmanagement.listener:
+    build:
+      context: ./TaskManagement.Listener
+      dockerfile: Dockerfile
+    env_file: ".env"
+    container_name: taskmanagement.listener
+    depends_on: [taskmanagement.api]
+    environment:
+      ASPNETCORE_URLS: http://+:8080
