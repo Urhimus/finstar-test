@@ -12,7 +12,7 @@
 * .NET SDK 8.0
 * RabbitMQ
 * PostgreSQL
-**ИЛИ**
+\n**ИЛИ**
 * Docker 24+ и docker compose v3
 
 ### 2. Клонирование репозитория
